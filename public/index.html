@@ -4,11 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube 字幕提取与整理工具</title>
+    <title>视频字幕提取与分析工具</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
+        /* 自定义样式 */
         .loader {
-            border-top-color: #3498db;
+            border-top-color: #3B82F6;
             -webkit-animation: spinner 1.5s linear infinite;
             animation: spinner 1.5s linear infinite;
         }
@@ -22,64 +24,173 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        .subtitle-item:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        
+        .subtitle-item.active {
+            background-color: rgba(59, 130, 246, 0.2);
+            border-left: 4px solid #3B82F6;
+        }
+        
+        .tab-active {
+            color: #3B82F6;
+            border-bottom: 2px solid #3B82F6;
+        }
+        
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        /* 响应式视频容器 */
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 比例 */
+            height: 0;
+            overflow: hidden;
+        }
+        
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-50 min-h-screen">
     <div class="container mx-auto px-4 py-8">
-        <header class="text-center mb-12">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">YouTube 字幕提取与整理工具</h1>
-            <p class="text-gray-600">输入 YouTube 链接，获取整理好的字幕文本</p>
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">视频字幕提取与分析工具</h1>
+            <p class="text-gray-600">输入 YouTube 链接，获取整理好的字幕文本和智能分析</p>
         </header>
         
-        <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6 mb-8">
             <form id="subtitle-form" class="mb-6">
-                <div class="mb-4">
-                    <label for="youtube-url" class="block text-gray-700 text-sm font-bold mb-2">YouTube 视频链接:</label>
-                    <input type="text" id="youtube-url" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="https://www.youtube.com/watch?v=...">
-                </div>
-                <div class="flex items-center justify-between">
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                        提取字幕
-                    </button>
-                    <div id="loading" class="hidden">
-                        <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-8 w-8"></div>
+                <div class="flex flex-col md:flex-row gap-4">
+                    <div class="flex-grow">
+                        <input type="text" id="youtube-url" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="粘贴 YouTube 视频链接...">
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="language-select" class="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="auto">自动检测</option>
+                            <option value="zh">中文</option>
+                            <option value="en">英文</option>
+                            <option value="ja">日文</option>
+                            <option value="ko">韩文</option>
+                            <option value="fr">法文</option>
+                            <option value="de">德文</option>
+                            <option value="es">西班牙文</option>
+                            <option value="ru">俄文</option>
+                        </select>
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-6 rounded-lg transition duration-200 flex items-center">
+                            <span>提取</span>
+                            <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
                     </div>
                 </div>
             </form>
             
-            <div id="result-container" class="hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-semibold text-gray-800">字幕内容</h2>
-                    <div>
-                        <button id="copy-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded text-sm mr-2">
-                            复制文本
-                        </button>
-                        <button id="download-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded text-sm">
-                            下载文本
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="video-info" class="mb-4 flex items-start">
-                    <img id="video-thumbnail" class="w-32 h-auto rounded mr-4" src="" alt="视频缩略图">
-                    <div>
-                        <h3 id="video-title" class="font-bold text-lg"></h3>
-                        <p id="video-channel" class="text-gray-600 text-sm"></p>
-                    </div>
-                </div>
-                
-                <div class="mb-4">
-                    <input type="text" id="search-subtitle" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="搜索字幕内容...">
-                </div>
-                
-                <div id="subtitle-content" class="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto"></div>
+            <div id="loading" class="hidden flex flex-col items-center justify-center py-12">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
+                <p class="text-gray-600">正在提取字幕，请稍候...</p>
             </div>
             
-            <div id="error-message" class="hidden mt-4 text-red-500 text-center"></div>
+            <div id="error-message" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6"></div>
         </div>
         
-        <footer class="text-center mt-8 text-gray-600 text-sm">
-            <p>© 2025 YouTube 字幕提取工具 - 让信息获取更高效</p>
+        <div id="result-container" class="hidden max-w-6xl mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- 左侧视频区域 -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                        <div id="video-container" class="video-container">
+                            <!-- YouTube 嵌入式播放器将在这里加载 -->
+                        </div>
+                        <div class="p-4">
+                            <h2 id="video-title" class="text-lg font-bold text-gray-800 mb-2 line-clamp-2"></h2>
+                            <div class="flex items-center text-gray-600 text-sm mb-4">
+                                <span id="video-channel" class="mr-3"></span>
+                                <span id="video-views" class="mr-3"></span>
+                                <span id="video-date"></span>
+                            </div>
+                            <div id="summary-container" class="mt-4 p-4 bg-blue-50 rounded-lg">
+                                <h3 class="font-bold text-gray-700 mb-2">内容摘要</h3>
+                                <p id="video-summary" class="text-gray-600 text-sm"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 右侧字幕区域 -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                        <!-- 标签页导航 -->
+                        <div class="flex border-b">
+                            <button id="tab-subtitle" class="tab-active flex-1 py-3 font-medium text-center focus:outline-none">
+                                字幕文本
+                            </button>
+                            <button id="tab-transcript" class="flex-1 py-3 font-medium text-center text-gray-500 focus:outline-none">
+                                完整文本
+                            </button>
+                        </div>
+                        
+                        <!-- 工具栏 -->
+                        <div class="p-4 border-b flex flex-wrap gap-2 items-center justify-between">
+                            <div class="flex items-center flex-grow">
+                                <div class="relative flex-grow">
+                                    <input type="text" id="search-subtitle" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="搜索字幕内容...">
+                                    <div class="absolute left-3 top-2.5 text-gray-400">
+                                        <i class="fas fa-search"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button id="copy-btn" class="flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 text-sm transition duration-200">
+                                    <i class="far fa-copy mr-1"></i>
+                                    <span>复制</span>
+                                </button>
+                                <button id="download-btn" class="flex items-center px-3 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-white text-sm transition duration-200">
+                                    <i class="fas fa-download mr-1"></i>
+                                    <span>下载</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 字幕内容区域 -->
+                        <div id="subtitle-container" class="h-[600px] overflow-y-auto p-2">
+                            <div id="subtitle-content" class="p-2"></div>
+                        </div>
+                        
+                        <!-- 完整文本区域 -->
+                        <div id="transcript-container" class="hidden h-[600px] overflow-y-auto p-4">
+                            <div id="transcript-content" class="whitespace-pre-wrap"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="text-center mt-12 text-gray-500 text-sm">
+            <p>© 2025 视频字幕提取与分析工具 - 让信息获取更高效</p>
         </footer>
     </div>
     
@@ -88,6 +199,7 @@
             const form = document.getElementById('subtitle-form');
             const resultContainer = document.getElementById('result-container');
             const subtitleContent = document.getElementById('subtitle-content');
+            const transcriptContent = document.getElementById('transcript-content');
             const errorMessage = document.getElementById('error-message');
             const loading = document.getElementById('loading');
             const copyBtn = document.getElementById('copy-btn');
@@ -95,12 +207,46 @@
             const searchInput = document.getElementById('search-subtitle');
             const videoTitle = document.getElementById('video-title');
             const videoChannel = document.getElementById('video-channel');
-            const videoThumbnail = document.getElementById('video-thumbnail');
+            const videoViews = document.getElementById('video-views');
+            const videoDate = document.getElementById('video-date');
+            const videoSummary = document.getElementById('video-summary');
+            const summaryContainer = document.getElementById('summary-container');
+            const videoContainer = document.getElementById('video-container');
+            const tabSubtitle = document.getElementById('tab-subtitle');
+            const tabTranscript = document.getElementById('tab-transcript');
+            const subtitleContainer = document.getElementById('subtitle-container');
+            const transcriptContainer = document.getElementById('transcript-container');
             
+            let player = null;
+            let currentSubtitles = [];
+            let activeSubtitleId = null;
+            
+            // 标签页切换
+            tabSubtitle.addEventListener('click', function() {
+                tabSubtitle.classList.add('tab-active');
+                tabSubtitle.classList.remove('text-gray-500');
+                tabTranscript.classList.remove('tab-active');
+                tabTranscript.classList.add('text-gray-500');
+                subtitleContainer.classList.remove('hidden');
+                transcriptContainer.classList.add('hidden');
+            });
+            
+            tabTranscript.addEventListener('click', function() {
+                tabTranscript.classList.add('tab-active');
+                tabTranscript.classList.remove('text-gray-500');
+                tabSubtitle.classList.remove('tab-active');
+                tabSubtitle.classList.add('text-gray-500');
+                transcriptContainer.classList.remove('hidden');
+                subtitleContainer.classList.add('hidden');
+            });
+            
+            // 表单提交
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
                 const youtubeUrl = document.getElementById('youtube-url').value.trim();
+                const language = document.getElementById('language-select').value;
+                
                 if (!youtubeUrl) {
                     showError('请输入有效的 YouTube 链接');
                     return;
@@ -118,25 +264,42 @@
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ url: youtubeUrl })
+                        body: JSON.stringify({ 
+                            url: youtubeUrl,
+                            language: language
+                        })
                     });
                     
                     if (!response.ok) {
-                        throw new Error('无法获取字幕，请确认视频链接正确且视频包含字幕');
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || '无法获取字幕，请确认视频链接正确且视频包含字幕');
                     }
                     
                     const data = await response.json();
+                    currentSubtitles = data.subtitles;
                     
                     // 显示视频信息
-                    videoTitle.textContent = data.videoInfo.title;
-                    videoChannel.textContent = data.videoInfo.channel;
-                    videoThumbnail.src = data.videoInfo.thumbnail;
+                    displayVideoInfo(data.videoInfo, youtubeUrl);
+                    
+                    // 显示摘要
+                    if (data.summary) {
+                        videoSummary.textContent = data.summary;
+                        summaryContainer.classList.remove('hidden');
+                    } else {
+                        summaryContainer.classList.add('hidden');
+                    }
                     
                     // 显示字幕内容
                     displaySubtitles(data.subtitles);
                     
+                    // 显示完整文本
+                    displayTranscript(data.subtitles);
+                    
                     // 显示结果容器
                     resultContainer.classList.remove('hidden');
+                    
+                    // 滚动到结果区域
+                    resultContainer.scrollIntoView({ behavior: 'smooth' });
                 } catch (error) {
                     showError(error.message);
                 } finally {
@@ -144,23 +307,145 @@
                 }
             });
             
-            // 显示字幕内容的函数
+            // 显示视频信息
+            function displayVideoInfo(videoInfo, youtubeUrl) {
+                videoTitle.textContent = videoInfo.title || '未知标题';
+                videoChannel.textContent = videoInfo.channel || '未知频道';
+                
+                // 格式化观看次数
+                if (videoInfo.viewCount) {
+                    const views = parseInt(videoInfo.viewCount);
+                    videoViews.textContent = `${formatNumber(views)} 次观看`;
+                } else {
+                    videoViews.textContent = '';
+                }
+                
+                // 格式化发布日期
+                if (videoInfo.publishedAt) {
+                    const date = new Date(videoInfo.publishedAt);
+                    videoDate.textContent = date.toLocaleDateString();
+                } else {
+                    videoDate.textContent = '';
+                }
+                
+                // 加载 YouTube 播放器
+                const videoId = extractVideoId(youtubeUrl);
+                loadYouTubePlayer(videoId);
+            }
+            
+            // 加载 YouTube 播放器
+            function loadYouTubePlayer(videoId) {
+                videoContainer.innerHTML = `
+                    <iframe 
+                        src="https://www.youtube.com/embed/${videoId}?enablejsapi=1" 
+                        frameborder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen
+                        id="youtube-player">
+                    </iframe>
+                `;
+                
+                // 当 YouTube API 准备好时初始化播放器
+                window.onYouTubeIframeAPIReady = function() {
+                    player = new YT.Player('youtube-player', {
+                        events: {
+                            'onStateChange': onPlayerStateChange
+                        }
+                    });
+                };
+                
+                // 如果 YouTube API 尚未加载，则加载它
+                if (!window.YT) {
+                    const tag = document.createElement('script');
+                    tag.src = 'https://www.youtube.com/iframe_api';
+                    const firstScriptTag = document.getElementsByTagName('script')[0];
+                    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+                } else if (window.YT.Player) {
+                    // 如果 API 已加载，直接初始化播放器
+                    window.onYouTubeIframeAPIReady();
+                }
+            }
+            
+            // 播放器状态变化事件
+            function onPlayerStateChange(event) {
+                if (event.data === YT.PlayerState.PLAYING) {
+                    // 开始定时检查当前播放时间并高亮对应字幕
+                    startHighlightInterval();
+                } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+                    // 停止定时检查
+                    stopHighlightInterval();
+                }
+            }
+            
+            let highlightInterval = null;
+            
+            // 开始定时检查当前播放时间
+            function startHighlightInterval() {
+                if (highlightInterval) {
+                    clearInterval(highlightInterval);
+                }
+                
+                highlightInterval = setInterval(() => {
+                    if (player && typeof player.getCurrentTime === 'function') {
+                        const currentTime = player.getCurrentTime();
+                        highlightCurrentSubtitle(currentTime);
+                    }
+                }, 500);
+            }
+            
+            // 停止定时检查
+            function stopHighlightInterval() {
+                if (highlightInterval) {
+                    clearInterval(highlightInterval);
+                    highlightInterval = null;
+                }
+            }
+            
+            // 高亮当前播放时间对应的字幕
+            function highlightCurrentSubtitle(currentTime) {
+                if (!currentSubtitles || currentSubtitles.length === 0) return;
+                
+                // 查找当前时间对应的字幕
+                const currentSubtitle = currentSubtitles.find(
+                    subtitle => currentTime >= subtitle.start && currentTime <= subtitle.end
+                );
+                
+                if (currentSubtitle && currentSubtitle.index !== activeSubtitleId) {
+                    // 移除之前的高亮
+                    const activeItems = document.querySelectorAll('.subtitle-item.active');
+                    activeItems.forEach(item => item.classList.remove('active'));
+                    
+                    // 添加新的高亮
+                    const newActiveItem = document.getElementById(`subtitle-${currentSubtitle.index}`);
+                    if (newActiveItem) {
+                        newActiveItem.classList.add('active');
+                        
+                        // 滚动到可视区域
+                        newActiveItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    
+                    activeSubtitleId = currentSubtitle.index;
+                }
+            }
+            
+            // 显示字幕内容
             function displaySubtitles(subtitles) {
                 subtitleContent.innerHTML = '';
                 
                 if (!subtitles || subtitles.length === 0) {
-                    subtitleContent.innerHTML = '<p class="text-gray-500">未找到字幕内容</p>';
+                    subtitleContent.innerHTML = '<p class="text-gray-500 p-4 text-center">未找到字幕内容</p>';
                     return;
                 }
                 
                 let html = '';
-                subtitles.forEach((item, index) => {
+                subtitles.forEach(item => {
                     html += `
-                        <div class="subtitle-item mb-2 pb-2 ${index !== subtitles.length - 1 ? 'border-b border-gray-200' : ''}">
-                            <div class="flex justify-between text-sm text-gray-500 mb-1">
-                                <span class="time-code">${formatTime(item.start)}</span>
-                                <a href="https://www.youtube.com/watch?v=${getVideoId(document.getElementById('youtube-url').value)}&t=${Math.floor(item.start)}" 
-                                   target="_blank" class="text-blue-500 hover:underline">跳转到视频</a>
+                        <div id="subtitle-${item.index}" class="subtitle-item p-3 rounded-lg mb-1 cursor-pointer" data-start="${item.start}">
+                            <div class="flex justify-between text-xs text-gray-500 mb-1">
+                                <span class="time-code font-mono">${formatTime(item.start)}</span>
+                                <button class="play-btn text-blue-500 hover:text-blue-700" data-time="${item.start}">
+                                    <i class="fas fa-play mr-1"></i>播放
+                                </button>
                             </div>
                             <p class="text-gray-800">${item.text}</p>
                         </div>
@@ -168,6 +453,40 @@
                 });
                 
                 subtitleContent.innerHTML = html;
+                
+                // 添加点击事件 - 跳转到视频对应位置
+                document.querySelectorAll('.play-btn').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const time = parseFloat(this.getAttribute('data-time'));
+                        if (player && typeof player.seekTo === 'function') {
+                            player.seekTo(time);
+                            player.playVideo();
+                        }
+                    });
+                });
+                
+                // 整个字幕项的点击事件
+                document.querySelectorAll('.subtitle-item').forEach(item => {
+                    item.addEventListener('click', function() {
+                        const time = parseFloat(this.getAttribute('data-start'));
+                        if (player && typeof player.seekTo === 'function') {
+                            player.seekTo(time);
+                            player.playVideo();
+                        }
+                    });
+                });
+            }
+            
+            // 显示完整文本
+            function displayTranscript(subtitles) {
+                if (!subtitles || subtitles.length === 0) {
+                    transcriptContent.textContent = '未找到字幕内容';
+                    return;
+                }
+                
+                const fullText = subtitles.map(item => item.text).join('\n\n');
+                transcriptContent.textContent = fullText;
             }
             
             // 搜索功能
@@ -175,10 +494,14 @@
                 const searchTerm = this.value.toLowerCase();
                 const subtitleItems = document.querySelectorAll('.subtitle-item');
                 
+                let hasResults = false;
+                
                 subtitleItems.forEach(item => {
                     const text = item.querySelector('p').textContent.toLowerCase();
                     if (text.includes(searchTerm)) {
                         item.style.display = 'block';
+                        hasResults = true;
+                        
                         if (searchTerm) {
                             highlightText(item.querySelector('p'), searchTerm);
                         }
@@ -186,24 +509,68 @@
                         item.style.display = 'none';
                     }
                 });
+                
+                // 如果没有搜索结果，显示提示
+                if (!hasResults && searchTerm) {
+                    const noResultsMsg = document.createElement('div');
+                    noResultsMsg.id = 'no-results';
+                    noResultsMsg.className = 'text-gray-500 p-4 text-center';
+                    noResultsMsg.textContent = `未找到包含 "${searchTerm}" 的字幕`;
+                    
+                    const existingMsg = document.getElementById('no-results');
+                    if (existingMsg) {
+                        existingMsg.remove();
+                    }
+                    
+                    subtitleContent.appendChild(noResultsMsg);
+                } else {
+                    const existingMsg = document.getElementById('no-results');
+                    if (existingMsg) {
+                        existingMsg.remove();
+                    }
+                }
             });
             
             // 高亮搜索文本
             function highlightText(element, searchTerm) {
                 const originalText = element.textContent;
-                const regex = new RegExp(searchTerm, 'gi');
-                const highlightedText = originalText.replace(regex, match => `<mark class="bg-yellow-200">${match}</mark>`);
+                const regex = new RegExp(`(${escapeRegExp(searchTerm)})`, 'gi');
+                const highlightedText = originalText.replace(regex, '<mark class="bg-yellow-200">$1</mark>');
                 element.innerHTML = highlightedText;
+            }
+            
+            // 转义正则表达式特殊字符
+            function escapeRegExp(string) {
+                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             }
             
             // 复制文本功能
             copyBtn.addEventListener('click', function() {
-                const text = Array.from(document.querySelectorAll('.subtitle-item p'))
-                    .map(p => p.textContent)
-                    .join('\n\n');
+                let text;
+                
+                // 根据当前活动的标签页决定复制内容
+                if (subtitleContainer.classList.contains('hidden')) {
+                    // 复制完整文本
+                    text = transcriptContent.textContent;
+                } else {
+                    // 复制字幕文本
+                    text = Array.from(document.querySelectorAll('.subtitle-item p'))
+                        .map(p => p.textContent)
+                        .join('\n\n');
+                }
                 
                 navigator.clipboard.writeText(text).then(() => {
-                    alert('字幕内容已复制到剪贴板');
+                    // 显示复制成功提示
+                    const originalText = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '<i class="fas fa-check mr-1"></i><span>已复制</span>';
+                    copyBtn.classList.remove('bg-gray-100', 'hover:bg-gray-200', 'text-gray-700');
+                    copyBtn.classList.add('bg-green-100', 'text-green-700');
+                    
+                    setTimeout(() => {
+                        copyBtn.innerHTML = originalText;
+                        copyBtn.classList.remove('bg-green-100', 'text-green-700');
+                        copyBtn.classList.add('bg-gray-100', 'hover:bg-gray-200', 'text-gray-700');
+                    }, 2000);
                 }).catch(err => {
                     console.error('复制失败:', err);
                 });
@@ -211,16 +578,32 @@
             
             // 下载文本功能
             downloadBtn.addEventListener('click', function() {
-                const text = Array.from(document.querySelectorAll('.subtitle-item p'))
-                    .map(p => p.textContent)
-                    .join('\n\n');
+                let text;
+                let fileType;
+                
+                // 根据当前活动的标签页决定下载内容
+                if (subtitleContainer.classList.contains('hidden')) {
+                    // 下载完整文本
+                    text = transcriptContent.textContent;
+                    fileType = 'transcript';
+                } else {
+                    // 下载字幕文本
+                    text = Array.from(document.querySelectorAll('.subtitle-item'))
+                        .map(item => {
+                            const timeCode = item.querySelector('.time-code').textContent;
+                            const content = item.querySelector('p').textContent;
+                            return `[${timeCode}] ${content}`;
+                        })
+                        .join('\n\n');
+                    fileType = 'subtitles';
+                }
                 
                 const title = videoTitle.textContent || '字幕内容';
                 const blob = new Blob([text], { type: 'text/plain' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${title.replace(/[^\w\s]/gi, '')}_字幕.txt`;
+                a.download = `${title.replace(/[^\w\s]/gi, '')}_${fileType}.txt`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -235,7 +618,17 @@
                 return `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
             }
             
-            function getVideoId(url) {
+            function formatNumber(num) {
+                if (num >= 1000000) {
+                    return (num / 1000000).toFixed(1) + 'M';
+                }
+                if (num >= 1000) {
+                    return (num / 1000).toFixed(1) + 'K';
+                }
+                return num.toString();
+            }
+            
+            function extractVideoId(url) {
                 const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
                 const match = url.match(regex);
                 return match ? match[1] : null;
@@ -245,6 +638,9 @@
                 errorMessage.textContent = message;
                 errorMessage.classList.remove('hidden');
                 resultContainer.classList.add('hidden');
+                
+                // 滚动到错误消息
+                errorMessage.scrollIntoView({ behavior: 'smooth' });
             }
         });
     </script>
