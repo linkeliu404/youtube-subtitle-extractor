@@ -260,15 +260,30 @@
                 try {
                     // 发送请求到后端 API
                     const response = await fetch('/api/extract-subtitle', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ 
-                            url: youtubeUrl,
-                            language: language
-                        })
-                    });
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ 
+        url: youtubeUrl,
+        language: language || 'auto'
+    })
+});
+                    
+// 并添加错误处理
+if (!response.ok) {
+    let errorMessage = '获取字幕失败';
+    try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+    } catch (e) {
+        // 如果响应不是 JSON 格式，获取文本内容
+        const errorText = await response.text();
+        console.error('API 返回非 JSON 响应:', errorText);
+        errorMessage = '服务器返回了非 JSON 格式的响应，请检查控制台获取详细信息';
+    }
+    throw new Error(errorMessage);
+}
                     
                     if (!response.ok) {
                         const errorData = await response.json();
