@@ -1,0 +1,252 @@
+// 前端代码 - index.html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube 字幕提取与整理工具</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .loader {
+            border-top-color: #3498db;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        
+        @-webkit-keyframes spinner {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+        
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-12">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">YouTube 字幕提取与整理工具</h1>
+            <p class="text-gray-600">输入 YouTube 链接，获取整理好的字幕文本</p>
+        </header>
+        
+        <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6">
+            <form id="subtitle-form" class="mb-6">
+                <div class="mb-4">
+                    <label for="youtube-url" class="block text-gray-700 text-sm font-bold mb-2">YouTube 视频链接:</label>
+                    <input type="text" id="youtube-url" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="https://www.youtube.com/watch?v=...">
+                </div>
+                <div class="flex items-center justify-between">
+                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        提取字幕
+                    </button>
+                    <div id="loading" class="hidden">
+                        <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-8 w-8"></div>
+                    </div>
+                </div>
+            </form>
+            
+            <div id="result-container" class="hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800">字幕内容</h2>
+                    <div>
+                        <button id="copy-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded text-sm mr-2">
+                            复制文本
+                        </button>
+                        <button id="download-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded text-sm">
+                            下载文本
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="video-info" class="mb-4 flex items-start">
+                    <img id="video-thumbnail" class="w-32 h-auto rounded mr-4" src="" alt="视频缩略图">
+                    <div>
+                        <h3 id="video-title" class="font-bold text-lg"></h3>
+                        <p id="video-channel" class="text-gray-600 text-sm"></p>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <input type="text" id="search-subtitle" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="搜索字幕内容...">
+                </div>
+                
+                <div id="subtitle-content" class="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto"></div>
+            </div>
+            
+            <div id="error-message" class="hidden mt-4 text-red-500 text-center"></div>
+        </div>
+        
+        <footer class="text-center mt-8 text-gray-600 text-sm">
+            <p>© 2025 YouTube 字幕提取工具 - 让信息获取更高效</p>
+        </footer>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('subtitle-form');
+            const resultContainer = document.getElementById('result-container');
+            const subtitleContent = document.getElementById('subtitle-content');
+            const errorMessage = document.getElementById('error-message');
+            const loading = document.getElementById('loading');
+            const copyBtn = document.getElementById('copy-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const searchInput = document.getElementById('search-subtitle');
+            const videoTitle = document.getElementById('video-title');
+            const videoChannel = document.getElementById('video-channel');
+            const videoThumbnail = document.getElementById('video-thumbnail');
+            
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const youtubeUrl = document.getElementById('youtube-url').value.trim();
+                if (!youtubeUrl) {
+                    showError('请输入有效的 YouTube 链接');
+                    return;
+                }
+                
+                // 显示加载状态
+                loading.classList.remove('hidden');
+                resultContainer.classList.add('hidden');
+                errorMessage.classList.add('hidden');
+                
+                try {
+                    // 发送请求到后端 API
+                    const response = await fetch('/api/extract-subtitle', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ url: youtubeUrl })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('无法获取字幕，请确认视频链接正确且视频包含字幕');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // 显示视频信息
+                    videoTitle.textContent = data.videoInfo.title;
+                    videoChannel.textContent = data.videoInfo.channel;
+                    videoThumbnail.src = data.videoInfo.thumbnail;
+                    
+                    // 显示字幕内容
+                    displaySubtitles(data.subtitles);
+                    
+                    // 显示结果容器
+                    resultContainer.classList.remove('hidden');
+                } catch (error) {
+                    showError(error.message);
+                } finally {
+                    loading.classList.add('hidden');
+                }
+            });
+            
+            // 显示字幕内容的函数
+            function displaySubtitles(subtitles) {
+                subtitleContent.innerHTML = '';
+                
+                if (!subtitles || subtitles.length === 0) {
+                    subtitleContent.innerHTML = '<p class="text-gray-500">未找到字幕内容</p>';
+                    return;
+                }
+                
+                let html = '';
+                subtitles.forEach((item, index) => {
+                    html += `
+                        <div class="subtitle-item mb-2 pb-2 ${index !== subtitles.length - 1 ? 'border-b border-gray-200' : ''}">
+                            <div class="flex justify-between text-sm text-gray-500 mb-1">
+                                <span class="time-code">${formatTime(item.start)}</span>
+                                <a href="https://www.youtube.com/watch?v=${getVideoId(document.getElementById('youtube-url').value)}&t=${Math.floor(item.start)}" 
+                                   target="_blank" class="text-blue-500 hover:underline">跳转到视频</a>
+                            </div>
+                            <p class="text-gray-800">${item.text}</p>
+                        </div>
+                    `;
+                });
+                
+                subtitleContent.innerHTML = html;
+            }
+            
+            // 搜索功能
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const subtitleItems = document.querySelectorAll('.subtitle-item');
+                
+                subtitleItems.forEach(item => {
+                    const text = item.querySelector('p').textContent.toLowerCase();
+                    if (text.includes(searchTerm)) {
+                        item.style.display = 'block';
+                        if (searchTerm) {
+                            highlightText(item.querySelector('p'), searchTerm);
+                        }
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+            
+            // 高亮搜索文本
+            function highlightText(element, searchTerm) {
+                const originalText = element.textContent;
+                const regex = new RegExp(searchTerm, 'gi');
+                const highlightedText = originalText.replace(regex, match => `<mark class="bg-yellow-200">${match}</mark>`);
+                element.innerHTML = highlightedText;
+            }
+            
+            // 复制文本功能
+            copyBtn.addEventListener('click', function() {
+                const text = Array.from(document.querySelectorAll('.subtitle-item p'))
+                    .map(p => p.textContent)
+                    .join('\n\n');
+                
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('字幕内容已复制到剪贴板');
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                });
+            });
+            
+            // 下载文本功能
+            downloadBtn.addEventListener('click', function() {
+                const text = Array.from(document.querySelectorAll('.subtitle-item p'))
+                    .map(p => p.textContent)
+                    .join('\n\n');
+                
+                const title = videoTitle.textContent || '字幕内容';
+                const blob = new Blob([text], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${title.replace(/[^\w\s]/gi, '')}_字幕.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+            
+            // 辅助函数
+            function formatTime(seconds) {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = Math.floor(seconds % 60);
+                return `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            }
+            
+            function getVideoId(url) {
+                const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+                const match = url.match(regex);
+                return match ? match[1] : null;
+            }
+            
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.classList.remove('hidden');
+                resultContainer.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
